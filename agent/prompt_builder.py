@@ -2207,6 +2207,103 @@ def load_soul_md(
         return None
 
 
+# =========================================================================
+# Ethos: company constitution (CONSTITUTION.md)
+# =========================================================================
+
+ETHOS_CONSTITUTION_PREAMBLE = (
+    "# Company constitution\n\n"
+    "The document below is the operating company's constitution. It governs "
+    "every response in this session and sits ABOVE persona, style, and memory "
+    "customization: where they conflict, the constitution wins. It is changed "
+    "only by the company's ratification process — never in-session. Its own "
+    "dissent clause defines how conflicting-but-superior options are surfaced "
+    "and what operators may override."
+)
+
+_ETHOS_VERSION_LABELS = (
+    "Company", "Profile-Version", "Schema-Version", "Constitution-Version",
+    "Variant", "Compiled", "Source-Commit", "Ratification-Session",
+)
+
+
+def _parse_constitution_version(content: str) -> dict:
+    """Parse the constitution's machine-readable ``Key: value`` version block.
+
+    The block lives in section 1 of every compiled constitution (the contract
+    is pinned by the values repository's verify tooling); scanning the first
+    60 lines is deliberate — the labels must not be re-parsed out of later
+    prose.
+    """
+    info: dict = {}
+    for line in content.splitlines()[:60]:
+        line = line.strip().strip("`")
+        for label in _ETHOS_VERSION_LABELS:
+            prefix = label + ":"
+            if line.startswith(prefix):
+                info.setdefault(label, line[len(prefix):].strip())
+    return info
+
+
+def load_constitution_md(
+    context_length: Optional[int] = None,
+    home_override: "Path | None" = None,
+) -> Optional[str]:
+    """Load the company constitution (Ethos layer) as an injectable block.
+
+    ``CONSTITUTION.md`` in HERMES_HOME — or the file named by the
+    ``ETHOS_CONSTITUTION_PATH`` env var — is composed into the system prompt
+    ABOVE the identity slot (see ``agent/system_prompt.py`` and ``ETHOS.md``).
+    Unlike SOUL.md it is injected unconditionally when present: cron and
+    skip-context modes still act for the company.
+
+    Returns ``None`` when: ``ETHOS_VANILLA`` is truthy (the explicit, logged
+    vanilla-mode switch); no constitution file exists (logged — a session
+    without one runs vanilla, visibly); or on any read error (defensive: a
+    broken file must never break prompt assembly).
+    """
+    if os.environ.get("ETHOS_VANILLA", "").strip().lower() in ("1", "true", "yes", "on"):
+        logger.info("Ethos: ETHOS_VANILLA set — constitution NOT injected (explicit vanilla mode)")
+        return None
+
+    path_override = os.environ.get("ETHOS_CONSTITUTION_PATH", "").strip()
+    if path_override:
+        const_path = Path(path_override).expanduser()
+    else:
+        try:
+            from hermes_cli.config import ensure_hermes_home
+            ensure_hermes_home()
+        except Exception as e:
+            logger.debug("Could not ensure HERMES_HOME before loading CONSTITUTION.md: %s", e)
+        _home = Path(home_override) if home_override is not None else get_hermes_home()
+        const_path = _home / "CONSTITUTION.md"
+
+    if not const_path.exists():
+        logger.info("Ethos: no constitution at %s — session runs vanilla", const_path)
+        return None
+    try:
+        content = const_path.read_text(encoding="utf-8").strip()
+        if not content:
+            return None
+        content = _scan_context_content(content, "CONSTITUTION.md")
+        content = _truncate_content(
+            content, "CONSTITUTION.md", context_length=context_length,
+            read_path=str(const_path),
+        )
+        info = _parse_constitution_version(content)
+        logger.info(
+            "Ethos constitution active: company=%s constitution=%s variant=%s profile=%s (%s)",
+            info.get("Company", "?"), info.get("Constitution-Version", "?"),
+            info.get("Variant", "?"), info.get("Profile-Version", "?"), const_path,
+        )
+        if any("DEMO" in v for v in info.values()):
+            logger.warning("Ethos: DEMO constitution loaded — invented content, not ratified")
+        return f"{ETHOS_CONSTITUTION_PREAMBLE}\n\n{content}"
+    except Exception as e:
+        logger.warning("Ethos: could not read constitution from %s: %s", const_path, e)
+        return None
+
+
 def _load_hermes_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
     """.hermes.md / HERMES.md — walk to git root."""
     hermes_md_path = _find_hermes_md(cwd_path)

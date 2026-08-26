@@ -1,0 +1,14 @@
+Ethos — a downstream distribution of Hermes Agent
+
+This software is a fork of Hermes Agent (https://github.com/NousResearch/hermes-agent),
+copyright Nous Research and contributors, distributed under the MIT License (see LICENSE,
+which is retained unmodified from upstream).
+
+Changes relative to upstream are limited to the Ethos constitution layer and its
+documentation and tests — see ETHOS.md for the exact patch surface.
+
+"Hermes", "Hermes Agent", and "Nous Research" are names of the upstream project and its
+maintainers. Ethos is an independent distribution and is not affiliated with, sponsored by,
+or endorsed by Nous Research. Upstream names appearing in code-level identifiers, paths, and
+configuration keys are retained for compatibility and rebase-friendliness and do not imply
+endorsement.
