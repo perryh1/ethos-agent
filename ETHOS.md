@@ -67,6 +67,9 @@ The ai-values verify tooling pins the same labels on the template side.
 | `agent/system_prompt.py` | +9-line hook at the top of the stable tier; docstring tier list updated |
 | `run_agent.py` | +1 re-export line (test-patching contract, same as `load_soul_md`) |
 | `ETHOS.md`, `NOTICE`, `ethos/`, `tests/test_ethos_constitution.py`, `README.md` top section | additions |
+| `hermes_cli/web_server.py` | `/api/status` gains an `ethos` block (constitution status, from `get_constitution_status`) |
+| `web/` (dashboard SPA) | Ethos shell branding (wordmark, title, theme names, update labels) + the `EthosBadge` constitution indicator in the nav; deep feature strings stay upstream |
+| `hermes_cli/web_dist/` | **Committed prebuilt dashboard bundle** (upstream gitignores it) — `hermes dashboard --skip-build` serves it with no Node toolchain |
 
 Everything else is untouched upstream. To pull upstream updates:
 `git remote add upstream https://github.com/NousResearch/hermes-agent && git fetch upstream
@@ -77,8 +80,10 @@ and each change is additive.
 
 1. `ethos:` config block in `config.yaml` (constitution path, product name, accent tokens)
    replacing the env vars as the primary interface.
-2. Version badge in the TUI/desktop status surfaces (the parsed info is already available).
-3. White-label branding tokens for user-facing product strings.
+2. Version badge in the TUI/desktop status surfaces (done for the **web dashboard**: the nav
+   shows the constitution badge, fed by `/api/status.ethos`; TUI/desktop remain).
+3. White-label branding tokens for user-facing product strings (shell done for the web
+   dashboard; deep feature strings and TUI banner skinning remain).
 4. Conflict/override capture: a `/flag` affordance writing entries in the values repo's
    conflict-log schema — the manual stand-in for the gateway intake.
 

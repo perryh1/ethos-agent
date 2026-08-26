@@ -1879,6 +1879,21 @@ export interface StatusResponse {
   /** False when the dashboard is running in a hosted/managed layout where
    * updates are handled by the outer launcher instead of ``hermes update``. */
   can_update_hermes?: boolean;
+  /** Ethos: the company-constitution layer's status. ``active`` when a
+   * CONSTITUTION.md is configured and parseable; ``demo`` when its version
+   * block is DEMO-marked; ``vanilla_switch`` when ETHOS_VANILLA suppressed
+   * injection explicitly. Absent on pre-Ethos backends. */
+  ethos?: {
+    active: boolean;
+    vanilla_switch?: boolean;
+    path?: string | null;
+    company?: string | null;
+    constitution_version?: string | null;
+    profile_version?: string | null;
+    variant?: string | null;
+    compiled?: string | null;
+    demo?: boolean;
+  };
   config_path: string;
   config_version: number;
   env_path: string;

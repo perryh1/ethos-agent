@@ -2304,6 +2304,45 @@ def load_constitution_md(
         return None
 
 
+def get_constitution_status(home_override: "Path | None" = None) -> dict:
+    """Ethos: parsed status of the configured constitution, without injecting.
+
+    Powers surfaces that show whether sessions run governed or vanilla (the
+    web dashboard badge; future TUI badge). Mirrors ``load_constitution_md``'s
+    resolution order exactly. Never raises.
+    """
+    status: dict = {"active": False, "vanilla_switch": False, "path": None}
+    try:
+        if os.environ.get("ETHOS_VANILLA", "").strip().lower() in ("1", "true", "yes", "on"):
+            status["vanilla_switch"] = True
+            return status
+        path_override = os.environ.get("ETHOS_CONSTITUTION_PATH", "").strip()
+        if path_override:
+            const_path = Path(path_override).expanduser()
+        else:
+            _home = Path(home_override) if home_override is not None else get_hermes_home()
+            const_path = _home / "CONSTITUTION.md"
+        status["path"] = str(const_path)
+        if not const_path.exists():
+            return status
+        content = const_path.read_text(encoding="utf-8").strip()
+        if not content:
+            return status
+        info = _parse_constitution_version(content)
+        status.update({
+            "active": True,
+            "company": info.get("Company"),
+            "constitution_version": info.get("Constitution-Version"),
+            "profile_version": info.get("Profile-Version"),
+            "variant": info.get("Variant"),
+            "compiled": info.get("Compiled"),
+            "demo": any("DEMO" in v for v in info.values()),
+        })
+    except Exception as e:
+        logger.debug("Ethos: constitution status failed: %s", e)
+    return status
+
+
 def _load_hermes_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
     """.hermes.md / HERMES.md — walk to git root."""
     hermes_md_path = _find_hermes_md(cwd_path)
