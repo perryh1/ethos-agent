@@ -127,6 +127,49 @@ function RootRedirect() {
   return <Navigate to="/sessions" replace />;
 }
 
+/** Ethos: shows whether sessions run governed (constitution active) or
+ * vanilla. Self-fetching so it can sit in the nav shell without threading
+ * status props through it; /api/status is public, so this renders pre-login. */
+function EthosBadge() {
+  const [eth, setEth] = useState<StatusResponse["ethos"] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .getStatus()
+      .then((s) => {
+        if (alive) setEth(s.ethos ?? { active: false });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!eth) return null;
+  const label = eth.active
+    ? `${eth.company ?? "constitution"} · ${eth.constitution_version ?? "?"}${eth.demo ? " · demo" : ""}`
+    : eth.vanilla_switch
+      ? "vanilla (explicit)"
+      : "vanilla — no constitution";
+  const title = eth.active
+    ? `Constitution active — profile ${eth.profile_version ?? "?"}, variant ${eth.variant ?? "?"}, compiled ${eth.compiled ?? "?"}. Every session composes it above the persona.`
+    : "No CONSTITUTION.md is loaded — sessions run ungoverned. Drop a compiled constitution into the agent home to govern them.";
+  return (
+    <span
+      title={title}
+      className={
+        "mt-1 inline-block w-fit rounded-sm border px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.08em] " +
+        (eth.active
+          ? eth.demo
+            ? "border-amber-500/50 text-amber-600 dark:text-amber-400"
+            : "border-amber-600/40 text-amber-700 dark:text-amber-400"
+          : "border-border text-muted-foreground")
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
 function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
   if (pluginsLoading) {
     // Render nothing during the plugin-load window — a spinner here would just flash.
@@ -611,11 +654,12 @@ export default function App() {
               >
                 <PluginSlot name="header-left" />
 
-                <Typography className="font-bold text-[1.125rem] leading-[0.95] tracking-[0.0525rem] text-midground uppercase">
-                  Hermes
-                  <br />
-                  Agent
-                </Typography>
+                <div className="flex flex-col">
+                  <Typography className="font-bold text-[1.125rem] leading-[0.95] tracking-[0.0525rem] text-midground uppercase">
+                    Ethos
+                  </Typography>
+                  <EthosBadge />
+                </div>
               </div>
 
               <Button

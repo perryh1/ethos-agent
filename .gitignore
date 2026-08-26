@@ -81,7 +81,8 @@ ignored/
 environments/benchmarks/evals/
 
 # Web UI build output
-hermes_cli/web_dist/
+# Ethos: web_dist is COMMITTED in this fork (prebuilt dashboard, no npm needed to serve)
+# hermes_cli/web_dist/
 # Cross-process web UI build lock (flock target, always empty)
 .web_ui_build.lock
 apps/desktop/build/

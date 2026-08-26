@@ -3968,11 +3968,17 @@ async def get_status(profile: Optional[str] = None):
         # probes (NAS's wildcard-subdomain liveness probe), the SPA's pre-login
         # bootstrap, and anyone who can curl the host — i.e. exactly the audience
         # ``PUBLIC_API_PATHS`` documents this endpoint as serving.
+        try:
+            from agent.prompt_builder import get_constitution_status
+            _ethos_status = get_constitution_status()
+        except Exception:
+            _ethos_status = {"active": False}
         status = {
             "version": __version__,
             "release_date": __release_date__,
             "config_version": current_ver,
             "latest_config_version": latest_ver,
+            "ethos": _ethos_status,
             "can_update_hermes": not _dashboard_local_update_managed_externally(),
             "gateway_running": gateway_running,
             "gateway_state": gateway_state,

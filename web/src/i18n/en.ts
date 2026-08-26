@@ -53,7 +53,7 @@ export const en: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
+    brand: "Ethos",
     brandShort: "HA",
     closeNavigation: "Close navigation",
     closeModelTools: "Close model and tools",
@@ -132,7 +132,7 @@ export const en: Translations = {
     recentSessions: "Recent Sessions",
     restartGateway: "Restart Gateway",
     restartGatewayConfirmMessage:
-      "This restarts the Hermes gateway process. Connected channels and active sessions will reconnect afterward.",
+      "This restarts the gateway process. Connected channels and active sessions will reconnect afterward.",
     restartGatewayConfirmTitle: "Restart gateway?",
     restartingGateway: "Restarting gateway…",
     running: "Running",
@@ -141,12 +141,12 @@ export const en: Translations = {
     starting: "Starting",
     startedInBackground: "Started in background — check logs for progress",
     stopped: "Stopped",
-    updateHermes: "Update Hermes",
+    updateHermes: "Update core",
     updateHermesConfirmMessage:
       "This runs hermes update and restarts the gateway when it finishes. Active sessions keep their prompt cache until then.",
     updateHermesConfirmNow: "Update now",
-    updateHermesConfirmTitle: "Update Hermes?",
-    updatingHermes: "Updating Hermes…",
+    updateHermesConfirmTitle: "Update the Hermes Agent core?",
+    updatingHermes: "Updating core…",
     waitingForOutput: "Waiting for output…",
   },
 
