@@ -1,3 +1,26 @@
+# Ethos
+
+**Any model. Your company's ethos, always on top.**
+
+Ethos is a white-label distribution of the MIT-licensed [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+(retained below, unmodified — see `NOTICE`) that adds a **company constitution layer**: drop a
+compiled, ratified values document at `~/.hermes/CONSTITUTION.md` and every session — CLI,
+TUI, desktop, Telegram/Discord/Slack gateways — composes it into the system prompt **above**
+the agent's own persona. Bring your own API key and run any model (OpenRouter, Anthropic,
+OpenAI, Nous Portal, local endpoints); the constitution rides on top of all of them. Running
+without one requires the explicit, logged `ETHOS_VANILLA=1` switch — never a silent default.
+
+- **How it works, the version-block contract, and the patch surface:** [`ETHOS.md`](ETHOS.md)
+- **Try it now:** `cp ethos/demo-constitution.md ~/.hermes/CONSTITUTION.md` (loudly marked
+  DEMO — invented values, not ratified)
+- **Where constitutions come from:** the companion **ai-values** repository — a governed
+  elicitation → ratification → compilation pipeline that turns a leadership group's real
+  answers into the document this layer injects.
+
+Everything below is the upstream project this distribution is built on.
+
+---
+
 <p align="center">
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>

@@ -9,11 +9,12 @@ fork inherits the cached prompt verbatim.
 
 Three tiers are joined with ``\\n\\n``:
 
-* ``stable``   — identity (SOUL.md or DEFAULT_AGENT_IDENTITY), tool
-  guidance, computer-use guidance, nous subscription block, tool-use
-  enforcement guidance + per-model operational guidance,
-  alibaba model-name workaround, environment hints, coding guidance,
-  platform hints.
+* ``stable``   — company constitution (Ethos ``CONSTITUTION.md``, when
+  present — always first, above identity), identity (SOUL.md or
+  DEFAULT_AGENT_IDENTITY), tool guidance, computer-use guidance, nous
+  subscription block, tool-use enforcement guidance + per-model
+  operational guidance, alibaba model-name workaround, environment
+  hints, coding guidance, platform hints.
 * ``context``  — caller-supplied ``system_message`` plus context files
   (AGENTS.md / .cursorrules / etc.) discovered under ``TERMINAL_CWD``,
   plus the session's coding-workspace snapshot.
@@ -374,6 +375,18 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
 
     # ── Stable tier ────────────────────────────────────────────────
     stable_parts: List[str] = []
+
+    # Ethos: the company constitution is composed ABOVE identity, never below
+    # it, and — unlike SOUL.md — unconditionally when present: cron and
+    # skip-context modes still act for the company. ETHOS_VANILLA=1 is the
+    # only (explicit, logged) way to run without it. See ETHOS.md.
+    try:
+        _constitution = _r.load_constitution_md(_ctx_len, home_override=_agent_home(agent))
+    except Exception:
+        logger.warning("Ethos: constitution load failed; continuing without it", exc_info=True)
+        _constitution = None
+    if _constitution:
+        stable_parts.append(_constitution)
 
     # Try SOUL.md as primary identity unless the caller explicitly skipped it.
     # Some execution modes (cron) still want HERMES_HOME persona while keeping
