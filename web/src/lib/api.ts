@@ -337,6 +337,11 @@ function appendSessionFilters(url: string, options: SessionQueryOptions): string
 export const api = {
   buildWsUrl,
   getStatus: () => fetchJSON<StatusResponse>("/api/status"),
+  /** Ethos: the active constitution document (auth-gated; content null when vanilla). */
+  getEthosConstitution: () =>
+    fetchJSON<{ status: NonNullable<StatusResponse["ethos"]>; content: string | null }>(
+      "/api/ethos/constitution",
+    ),
   /**
    * Identity probe for the dashboard auth gate (Phase 7).
    *
