@@ -69,6 +69,7 @@ The ai-values verify tooling pins the same labels on the template side.
 | `ETHOS.md`, `NOTICE`, `ethos/`, `tests/test_ethos_constitution.py`, `README.md` top section | additions |
 | `hermes_cli/web_server.py` | `/api/status` gains an `ethos` block (constitution status, from `get_constitution_status`) |
 | `web/` (dashboard SPA) | Ethos shell branding (wordmark, title, theme names, update labels) + the `EthosBadge` constitution indicator in the nav; deep feature strings stay upstream |
+| `web/public/sittings.html` | **Bundled Sittings questionnaire** — the values-elicitation instrument (personal + corporate tracks) as a self-contained static page, served at `/sittings.html` behind the dashboard's auth gate, with a "Sittings" sidebar entry (`external` nav item, full-page navigation). Answers stay in the respondent's browser (localStorage); the page never scores — the exported YAML goes to the scorer per the ai-values rubric |
 | `hermes_cli/web_dist/` | **Committed prebuilt dashboard bundle** (upstream gitignores it) — `hermes dashboard --skip-build` serves it with no Node toolchain |
 
 Everything else is untouched upstream. To pull upstream updates:

@@ -44,6 +44,7 @@ import {
   Puzzle,
   Radio,
   RotateCw,
+  Scale,
   Settings,
   Shield,
   ShieldCheck,
@@ -258,6 +259,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/config", labelKey: "config", label: "Config", icon: Settings },
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
   { path: "/system", label: "System", icon: Wrench },
+  { path: "/sittings.html", label: "Sittings", icon: Scale, external: true },
   {
     path: "/docs",
     labelKey: "documentation",
@@ -911,6 +913,55 @@ function SidebarNavLink({
     setTooltipAnchor(null);
   };
 
+  if (item.external) {
+    // Static page outside the SPA router: full navigation, never "active".
+    return (
+      <li
+        onMouseEnter={collapsed ? showTooltip : undefined}
+        onMouseLeave={collapsed ? hideTooltip : undefined}
+      >
+        <a
+          href={path}
+          onClick={closeMobile}
+          aria-label={collapsed ? navLabel : undefined}
+          onFocus={collapsed ? showTooltip : undefined}
+          onBlur={collapsed ? hideTooltip : undefined}
+          className={cn(
+            "group/nav relative flex items-center gap-3",
+            "px-5 py-2.5",
+            "font-sans text-display uppercase text-sm tracking-[0.12em]",
+            "whitespace-nowrap transition-colors cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground",
+            "text-text-secondary hover:text-midground",
+          )}
+          style={{
+            clipPath: "var(--component-tab-clip-path)",
+          }}
+        >
+          <Icon className="h-3.5 w-3.5 shrink-0" />
+
+          <span
+            className={cn(
+              "truncate transition-opacity duration-300",
+              collapsed ? "lg:opacity-0" : "lg:opacity-100",
+            )}
+          >
+            {navLabel}
+          </span>
+
+          <span
+            aria-hidden
+            className="absolute inset-y-0.5 left-1.5 right-1.5 bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/nav:opacity-5"
+          />
+        </a>
+
+        {collapsed && hovered && tooltipAnchor && (
+          <SidebarTooltip anchor={tooltipAnchor} label={navLabel} warmRef={tooltipWarmRef} />
+        )}
+      </li>
+    );
+  }
+
   return (
     <li
       onMouseEnter={collapsed ? showTooltip : undefined}
@@ -1386,6 +1437,9 @@ interface GatewayDotProps {
 }
 
 interface NavItem {
+  // Full-page navigation to a static page outside the SPA router
+  // (e.g. the bundled Sittings questionnaire at /sittings.html).
+  external?: boolean;
   icon: ComponentType<{ className?: string }>;
   label: string;
   labelKey?: string;
