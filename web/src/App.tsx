@@ -145,6 +145,9 @@ function EthosBadge() {
       alive = false;
     };
   }, []);
+  const [open, setOpen] = useState(false);
+  const [doc, setDoc] = useState<{ content: string | null } | null>(null);
+  const [docErr, setDocErr] = useState(false);
   if (!eth) return null;
   const label = eth.active
     ? `${eth.company ?? "constitution"} · ${eth.constitution_version ?? "?"}${eth.demo ? " · demo" : ""}`
@@ -152,22 +155,100 @@ function EthosBadge() {
       ? "vanilla (explicit)"
       : "vanilla — no constitution";
   const title = eth.active
-    ? `Constitution active — profile ${eth.profile_version ?? "?"}, variant ${eth.variant ?? "?"}, compiled ${eth.compiled ?? "?"}. Every session composes it above the persona.`
+    ? `Constitution active — profile ${eth.profile_version ?? "?"}, variant ${eth.variant ?? "?"}, compiled ${eth.compiled ?? "?"}. Every session composes it above the persona. Click to read it.`
     : "No CONSTITUTION.md is loaded — sessions run ungoverned. Drop a compiled constitution into the agent home to govern them.";
+  const show = () => {
+    setOpen(true);
+    if (!doc) {
+      api
+        .getEthosConstitution()
+        .then((r) => setDoc({ content: r.content }))
+        .catch(() => setDocErr(true));
+    }
+  };
   return (
-    <span
-      title={title}
-      className={
-        "mt-1 inline-block w-fit rounded-sm border px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.08em] " +
-        (eth.active
-          ? eth.demo
-            ? "border-amber-500/50 text-amber-600 dark:text-amber-400"
-            : "border-amber-600/40 text-amber-700 dark:text-amber-400"
-          : "border-border text-muted-foreground")
-      }
-    >
-      {label}
-    </span>
+    <>
+      <button
+        type="button"
+        title={title}
+        onClick={show}
+        className={
+          "mt-1 inline-block w-fit cursor-pointer rounded-sm border px-1.5 py-0.5 text-left font-mono text-[0.6rem] uppercase tracking-[0.08em] hover:opacity-80 " +
+          (eth.active
+            ? eth.demo
+              ? "border-amber-500/50 text-amber-600 dark:text-amber-400"
+              : "border-amber-600/40 text-amber-700 dark:text-amber-400"
+            : "border-border text-muted-foreground")
+        }
+      >
+        {label}
+      </button>
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setOpen(false)}
+            role="dialog"
+            aria-label="Constitution"
+          >
+            <div
+              className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-md border border-border bg-background shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-baseline justify-between gap-3 border-b border-border px-4 py-3">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs uppercase tracking-[0.1em] text-muted-foreground">
+                    {eth.active ? "The rules this agent runs under" : "No constitution loaded"}
+                  </div>
+                  {eth.active && (
+                    <div className="truncate text-sm">
+                      {eth.company ?? "?"} · {eth.constitution_version ?? "?"} · variant{" "}
+                      {eth.variant ?? "?"} · compiled {eth.compiled ?? "?"}
+                      {eth.demo ? " · DEMO — not ratified" : ""}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded px-2 py-0.5 text-sm text-muted-foreground hover:bg-accent"
+                  onClick={() => setOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="overflow-y-auto px-4 py-3">
+                {eth.active ? (
+                  doc?.content != null ? (
+                    <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
+                      {doc.content}
+                    </pre>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      {docErr ? "Could not load the constitution document." : "Loading…"}
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>
+                      Sessions are running <b>vanilla</b> —{" "}
+                      {eth.vanilla_switch
+                        ? "the ETHOS_VANILLA switch is set, so the constitution is deliberately suppressed (and logged)."
+                        : "no CONSTITUTION.md is present in the agent home."}
+                    </p>
+                    <p>
+                      To govern sessions, drop a compiled constitution next to SOUL.md:{" "}
+                      <code className="font-mono text-xs">
+                        cp constitution.v1.md ~/.hermes/CONSTITUTION.md
+                      </code>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

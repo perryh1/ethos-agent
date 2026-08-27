@@ -3724,6 +3724,34 @@ def _merge_profile_gateway_platforms(
     return merged
 
 
+@app.get("/api/ethos/constitution")
+async def get_ethos_constitution():
+    """Ethos: the active constitution document, for the dashboard viewer.
+
+    Deliberately NOT in PUBLIC_API_PATHS — the document is the company's
+    governing values text, so it sits behind the dashboard auth gate like
+    every other content endpoint. Returns the raw markdown plus the parsed
+    status block; ``content`` is null when running vanilla.
+    """
+    try:
+        from agent.prompt_builder import get_constitution_status
+        eth = get_constitution_status()
+    except Exception:
+        eth = {"active": False}
+    content = None
+    path = eth.get("path") if isinstance(eth, dict) else None
+    if isinstance(eth, dict) and eth.get("active") and path:
+        try:
+            raw = Path(path).read_text(encoding="utf-8", errors="replace")
+            # Generous viewer cap — compiled constitutions are ~2k words.
+            content = raw[:262144]
+            if len(raw) > 262144:
+                content += "\n\n[truncated for viewer]"
+        except Exception:
+            content = None
+    return {"status": eth, "content": content}
+
+
 @app.get("/api/status")
 async def get_status(profile: Optional[str] = None):
     status_scope = None
@@ -18085,8 +18113,8 @@ def mount_spa(application: FastAPI):
 # Built-in dashboard themes — label + description only.  The actual color
 # definitions live in the frontend (web/src/themes/presets.ts).
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default",       "label": "Hermes Teal",         "description": "Classic dark teal — the canonical Hermes look"},
-    {"name": "default-large", "label": "Hermes Teal (Large)", "description": "Hermes Teal with bigger fonts and roomier spacing"},
+    {"name": "default",       "label": "Ethos Teal",         "description": "Classic dark teal — the canonical Ethos look"},
+    {"name": "default-large", "label": "Ethos Teal (Large)", "description": "Ethos Teal with bigger fonts and roomier spacing"},
     {"name": "nous-blue",     "label": "Nous Blue",           "description": "Light mode — vivid Nous-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
