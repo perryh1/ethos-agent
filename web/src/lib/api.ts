@@ -1899,6 +1899,9 @@ export interface StatusResponse {
     compiled?: string | null;
     demo?: boolean;
   };
+  /** Ethos: whether the served dist carries the (private, drop-in) Sittings
+   * instrument — gates the sidebar entry. Absent on pre-Ethos backends. */
+  sittings_available?: boolean;
   config_path: string;
   config_version: number;
   env_path: string;
