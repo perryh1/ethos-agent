@@ -4007,6 +4007,10 @@ async def get_status(profile: Optional[str] = None):
             "config_version": current_ver,
             "latest_config_version": latest_ver,
             "ethos": _ethos_status,
+            # Ethos: the Sittings instrument is private (not shipped in this
+            # repo). The nav entry renders only when the owner has dropped
+            # the built file into the served dist.
+            "sittings_available": (WEB_DIST / "sittings.html").is_file(),
             "can_update_hermes": not _dashboard_local_update_managed_externally(),
             "gateway_running": gateway_running,
             "gateway_state": gateway_state,

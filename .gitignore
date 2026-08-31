@@ -83,6 +83,13 @@ environments/benchmarks/evals/
 # Web UI build output
 # Ethos: web_dist is COMMITTED in this fork (prebuilt dashboard, no npm needed to serve)
 # hermes_cli/web_dist/
+# Ethos: the Sittings instrument is PRIVATE — its source and build pipeline live
+# in the owner's values repo, never here. To enable the questionnaire locally,
+# drop the built sittings.html into web/public/ (picked up by builds) and, when
+# serving with --skip-build, into hermes_cli/web_dist/ as well. The sidebar
+# entry hides itself when the file is absent.
+web/public/sittings.html
+hermes_cli/web_dist/sittings.html
 # Cross-process web UI build lock (flock target, always empty)
 .web_ui_build.lock
 apps/desktop/build/

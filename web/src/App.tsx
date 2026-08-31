@@ -586,10 +586,16 @@ export default function App() {
     const base = embeddedChat
       ? [CHAT_NAV_ITEM, ...BUILTIN_NAV_REST]
       : BUILTIN_NAV_REST;
-    return showTokenAnalytics
+    const withAnalytics = showTokenAnalytics
       ? base
       : base.filter((n) => n.path !== "/analytics");
-  }, [embeddedChat, showTokenAnalytics]);
+    // Sittings is a private instrument, not shipped in this repo: show the
+    // entry only when the served dist actually carries the file (status
+    // flag; treated as present until status loads so owners see no flicker).
+    return sidebarStatus?.sittings_available === false
+      ? withAnalytics.filter((n) => n.path !== "/sittings.html")
+      : withAnalytics;
+  }, [embeddedChat, showTokenAnalytics, sidebarStatus?.sittings_available]);
 
   const sidebarNav = useMemo(
     () => partitionSidebarNav(builtinNav, manifests),
