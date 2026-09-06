@@ -3752,6 +3752,91 @@ async def get_ethos_constitution():
     return {"status": eth, "content": content}
 
 
+# Ethos: a compiled constitution is ~2k words. Cap generously but finitely so a
+# runaway client can't fill the disk through this endpoint.
+_ETHOS_CONSTITUTION_MAX_BYTES = 262144
+
+
+def _ethos_constitution_target() -> Path:
+    """Resolve where a written constitution belongs.
+
+    Mirrors ``agent.prompt_builder.load_constitution_md`` exactly, so what we
+    write is what the next session reads: the ``ETHOS_CONSTITUTION_PATH``
+    override wins, otherwise ``CONSTITUTION.md`` in HERMES_HOME.
+    """
+    path_override = os.environ.get("ETHOS_CONSTITUTION_PATH", "").strip()
+    if path_override:
+        return Path(path_override).expanduser()
+    from hermes_constants import get_hermes_home
+    return get_hermes_home() / "CONSTITUTION.md"
+
+
+@app.post("/api/ethos/constitution")
+async def put_ethos_constitution(request: Request):
+    """Ethos: install a compiled constitution, so activation needs no terminal.
+
+    The bundled Sittings questionnaire is served from this dashboard's own
+    origin, so once someone finishes their sittings the page can POST the
+    constitution it compiled and have it govern the agent immediately. That
+    turns the single hardest step for a non-technical user -- saving a file and
+    running ``cp`` into ``~/.hermes`` -- into a button.
+
+    Auth-gated exactly like the GET (NOT in ``PUBLIC_API_PATHS``): this writes
+    the file that governs every future session, so it must never be reachable
+    unauthenticated. Any existing constitution is copied to ``.bak`` first --
+    activation must never be a silent, unrecoverable overwrite.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"detail": "Body must be JSON."}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"detail": "Body must be a JSON object."}, status_code=400)
+
+    content = body.get("content")
+    if not isinstance(content, str) or not content.strip():
+        return JSONResponse(
+            {"detail": "Missing 'content': the constitution markdown to install."},
+            status_code=400,
+        )
+    if len(content.encode("utf-8")) > _ETHOS_CONSTITUTION_MAX_BYTES:
+        return JSONResponse(
+            {"detail": f"Constitution exceeds {_ETHOS_CONSTITUTION_MAX_BYTES} bytes."},
+            status_code=400,
+        )
+    # Shape check, not a taste check: refuse obvious mis-posts (an empty
+    # buffer, a stray JSON blob, the wrong file) while staying agnostic about
+    # what a person's values actually say.
+    if "## 1. Version" not in content:
+        return JSONResponse(
+            {"detail": "That does not look like a compiled constitution "
+                       "(no '## 1. Version' section)."},
+            status_code=400,
+        )
+
+    target = _ethos_constitution_target()
+    backed_up = False
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            shutil.copy2(target, target.with_suffix(target.suffix + ".bak"))
+            backed_up = True
+        target.write_text(content, encoding="utf-8")
+    except Exception as e:
+        _log.exception("POST /api/ethos/constitution failed")
+        return JSONResponse(
+            {"detail": f"Could not write {target}: {e}"}, status_code=500
+        )
+
+    try:
+        from agent.prompt_builder import get_constitution_status
+        status = get_constitution_status()
+    except Exception:
+        status = {"active": True, "path": str(target)}
+    _log.info("Ethos: constitution installed at %s (backup=%s)", target, backed_up)
+    return {"ok": True, "path": str(target), "backed_up": backed_up, "status": status}
+
+
 @app.get("/api/status")
 async def get_status(profile: Optional[str] = None):
     status_scope = None
@@ -18106,6 +18191,25 @@ def mount_spa(application: FastAPI):
             and file_path.exists()
             and file_path.is_file()
         ):
+            # Ethos: the bundled Sittings questionnaire is a static page that
+            # nonetheless calls this dashboard's own API (to activate the
+            # constitution it compiles). Give it the same session bootstrap
+            # index.html gets, or its fetches would 401 on a loopback bind.
+            # In gated mode nothing is injected — the auth cookie travels with
+            # the same-origin fetch, exactly as it does for the SPA.
+            if file_path.name == "sittings.html":
+                try:
+                    page = file_path.read_text(encoding="utf-8")
+                    if not bool(getattr(app.state, "auth_required", False)):
+                        page = page.replace(
+                            "<body>",
+                            "<body>"
+                            f'<script>window.__HERMES_SESSION_TOKEN__="{_SESSION_TOKEN}";</script>',
+                            1,
+                        )
+                    return HTMLResponse(page)
+                except OSError:
+                    return FileResponse(file_path)
             return FileResponse(file_path)
         return _serve_index(prefix)
 

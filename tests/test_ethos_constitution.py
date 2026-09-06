@@ -111,3 +111,60 @@ def test_bundled_demo_constitution_parses_and_flags_demo():
     assert "DEMO" in info["Company"]
     assert "DEMO" in info["Constitution-Version"]
     assert info["Schema-Version"] == "1.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Personal-track constitutions (Owner:) and the one-click write path
+# ---------------------------------------------------------------------------
+
+PERSONAL_VERSION_BLOCK = """# Constitution — Sam
+
+## 1. Version
+
+```
+Owner: Sam Rivera
+Profile-Version: 0.1.0
+Schema-Version: 1.0.0
+Constitution-Version: v1
+Variant: full
+Compiled: 2026-09-06
+Source-Commit: sittings-web
+```
+
+## 3. Absolutes
+
+- Family First.
+"""
+
+
+def test_owner_label_parses_for_personal_constitutions():
+    """A personal profile names a person, not a company — both must parse."""
+    info = _parse_constitution_version(PERSONAL_VERSION_BLOCK)
+    assert info["Owner"] == "Sam Rivera"
+    assert info["Constitution-Version"] == "v1"
+
+
+def test_owner_fills_the_company_display_slot(tmp_path):
+    """The dashboard badge reads ``company``; Owner must feed it, or a personal
+    constitution shows an unlabelled badge."""
+    from agent.prompt_builder import get_constitution_status
+
+    (tmp_path / "CONSTITUTION.md").write_text(PERSONAL_VERSION_BLOCK, encoding="utf-8")
+    status = get_constitution_status(home_override=tmp_path)
+    assert status["active"] is True
+    assert status["company"] == "Sam Rivera"
+    assert status["constitution_version"] == "v1"
+    assert status["demo"] is False
+
+
+def test_constitution_write_target_honours_explicit_path(tmp_path, monkeypatch):
+    """The write endpoint must target exactly what the loader reads."""
+    from hermes_cli.web_server import _ethos_constitution_target
+
+    explicit = tmp_path / "elsewhere" / "MINE.md"
+    monkeypatch.setenv("ETHOS_CONSTITUTION_PATH", str(explicit))
+    assert _ethos_constitution_target() == explicit
+
+    monkeypatch.delenv("ETHOS_CONSTITUTION_PATH", raising=False)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    assert _ethos_constitution_target().name == "CONSTITUTION.md"

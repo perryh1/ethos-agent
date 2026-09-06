@@ -43,8 +43,10 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Configuration
-REPO_URL_SSH="git@github.com:NousResearch/hermes-agent.git"
-REPO_URL_HTTPS="https://github.com/NousResearch/hermes-agent.git"
+# Ethos: this fork installs the Ethos distribution, not upstream Hermes.
+# Overridable so a contributor can point the installer at another remote.
+REPO_URL_SSH="${HERMES_REPO_SSH:-git@github.com:perryh1/ethos-agent.git}"
+REPO_URL_HTTPS="${HERMES_REPO_HTTPS:-https://github.com/perryh1/ethos-agent.git}"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 # INSTALL_DIR is resolved AFTER arg parsing and OS detection so we can pick an
 # FHS-style layout for root installs.  Track whether the user gave us an

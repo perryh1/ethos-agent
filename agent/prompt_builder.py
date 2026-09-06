@@ -2222,8 +2222,12 @@ ETHOS_CONSTITUTION_PREAMBLE = (
 )
 
 _ETHOS_VERSION_LABELS = (
-    "Company", "Profile-Version", "Schema-Version", "Constitution-Version",
-    "Variant", "Compiled", "Source-Commit", "Ratification-Session",
+    # ``Owner`` is the personal-track counterpart of ``Company``: an individual's
+    # compiled constitution names a person, not an organisation. Both map to the
+    # same display slot in ``get_constitution_status``.
+    "Company", "Owner", "Profile-Version", "Schema-Version",
+    "Constitution-Version", "Variant", "Compiled", "Source-Commit",
+    "Ratification-Session",
 )
 
 
@@ -2331,7 +2335,7 @@ def get_constitution_status(home_override: "Path | None" = None) -> dict:
         info = _parse_constitution_version(content)
         status.update({
             "active": True,
-            "company": info.get("Company"),
+            "company": info.get("Company") or info.get("Owner"),
             "constitution_version": info.get("Constitution-Version"),
             "profile_version": info.get("Profile-Version"),
             "variant": info.get("Variant"),
