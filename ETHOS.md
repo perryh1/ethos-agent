@@ -53,8 +53,9 @@ block; loading it logs a warning so invented values can never pass as a company'
 ## The version-block contract
 
 Section 1 of every compiled constitution is fixed machine-parseable `Key: value` lines —
-`Company`, `Profile-Version`, `Schema-Version`, `Constitution-Version`, `Variant`,
-`Compiled`, `Source-Commit`, `Ratification-Session`. Ethos parses exactly these labels
+`Company` (or `Owner`, for a personal rather than corporate profile), `Profile-Version`,
+`Schema-Version`, `Constitution-Version`, `Variant`, `Compiled`, `Source-Commit`,
+`Ratification-Session`. Ethos parses exactly these labels
 (`_parse_constitution_version`) and logs them at session build, so every injected copy is
 traceable and the values repository's conflict/prediction logs can join on what actually ran.
 The ai-values verify tooling pins the same labels on the template side.
@@ -63,13 +64,14 @@ The ai-values verify tooling pins the same labels on the template side.
 
 | File | Change |
 |---|---|
-| `agent/prompt_builder.py` | +`load_constitution_md`, `_parse_constitution_version`, `ETHOS_CONSTITUTION_PREAMBLE` (new code only, after `load_soul_md`) |
+| `agent/prompt_builder.py` | +`load_constitution_md`, `_parse_constitution_version`, `get_constitution_status`, `ETHOS_CONSTITUTION_PREAMBLE` (new code only, after `load_soul_md`). The version block accepts `Owner:` alongside `Company:` — a personal constitution names a person — and both feed the same badge slot |
 | `agent/system_prompt.py` | +9-line hook at the top of the stable tier; docstring tier list updated |
 | `run_agent.py` | +1 re-export line (test-patching contract, same as `load_soul_md`) |
 | `ETHOS.md`, `NOTICE`, `ethos/`, `tests/test_ethos_constitution.py`, `README.md` top section | additions |
-| `hermes_cli/web_server.py` | `/api/status` gains an `ethos` block (constitution status, from `get_constitution_status`); `/api/ethos/constitution` (auth-gated) serves the active constitution document for the dashboard viewer; built-in theme labels de-branded |
+| `hermes_cli/web_server.py` | `/api/status` gains an `ethos` block (constitution status, from `get_constitution_status`); `GET /api/ethos/constitution` (auth-gated) serves the active document for the dashboard viewer and `POST` installs one (validates shape, backs the old one up to `.bak`) so activation needs no terminal; the served `sittings.html` gets the same session bootstrap `index.html` does, so its same-origin API calls authenticate; built-in theme labels de-branded |
 | `web/` (dashboard SPA) | Ethos shell branding (wordmark, title, theme names, update labels) + the `EthosBadge` constitution indicator in the nav; deep feature strings stay upstream |
 | Sittings (drop-in, NOT shipped) | The values-elicitation questionnaire is a **private instrument**: its source, items, keying, and build pipeline live in the owner's values repository, never in this public repo (both target paths are gitignored). When the owner drops the built `sittings.html` into `web/public/` (and `hermes_cli/web_dist/` for `--skip-build` serving), it is served at `/sittings.html` behind the dashboard's auth gate and a "Sittings" sidebar entry appears (`/api/status.sittings_available` gates it; absent file ⇒ no entry). The page runs entirely on-device: answers in the respondent's browser, scoring sealed until the final sitting, then an on-device Results stage with generated files (response sheet, profile preview, draft constitution) |
+| `scripts/install.sh` | `REPO_URL_SSH`/`REPO_URL_HTTPS` point at this fork (env-overridable), so the official installer provisions Ethos rather than upstream Hermes. Everything else in the 3.6k-line installer is untouched |
 | `hermes_cli/web_dist/` | **Committed prebuilt dashboard bundle** (upstream gitignores it) — `hermes dashboard --skip-build` serves it with no Node toolchain |
 
 Everything else is untouched upstream. To pull upstream updates:
