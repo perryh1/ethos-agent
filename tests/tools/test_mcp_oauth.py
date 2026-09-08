@@ -13,6 +13,7 @@ import asyncio
 from tools.mcp_oauth import (
     HermesTokenStorage,
     OAuthNonInteractiveError,
+    OAuthProviderError,
     build_oauth_auth,
     remove_oauth_tokens,
     _find_free_port,
@@ -446,6 +447,21 @@ class TestCallbackHandlerIsolation:
 
         assert result["auth_code"] is None
         assert result["error"] == "access_denied"
+        assert result["error_description"] is None
+
+    def test_handler_captures_error_description(self):
+        """RFC 6749 section 4.1.2.1: keep the provider's human-readable detail —
+        it is the only clue to *why* authorization was refused."""
+        HandlerClass, result = _make_callback_handler()
+
+        self._fake_get(
+            HandlerClass,
+            "/callback?error=invalid_request&error_description=Missing+redirect_uri",
+        )
+
+        assert result["auth_code"] is None
+        assert result["error"] == "invalid_request"
+        assert result["error_description"] == "Missing redirect_uri"
 
 
 # ---------------------------------------------------------------------------
@@ -1112,3 +1128,95 @@ def test_humanize_non_registration_403_passthrough():
         )
         is None
     )
+
+
+# ---------------------------------------------------------------------------
+# Provider-side errors at the callback (error=access_denied / invalid_request)
+# ---------------------------------------------------------------------------
+
+class TestWaitForCallbackProviderError:
+    """A provider ``error=`` redirect must raise ``OAuthProviderError``.
+
+    A plain ``RuntimeError`` was classified as *transient* by
+    ``tools.mcp_tool._classify_mcp_failure``, so the run loop retried the
+    authorization-code grant — and opened a fresh browser window — on every
+    rung of the reconnect ladder and on every parked self-probe. Typing the
+    error lets the server park after one browser open.
+    """
+
+    def test_http_callback_error_raises_provider_error(self, monkeypatch):
+        import threading
+        import tools.mcp_oauth as mod
+
+        monkeypatch.setattr(mod, "_is_interactive", lambda: False)
+        monkeypatch.setattr(mod, "_raise_if_non_interactive", lambda lead: None)
+
+        cfg: dict = {"cimd": False}
+        port = mod._configure_callback_port(cfg)
+        waiter = mod._make_callback_waiter(port)
+
+        async def drive():
+            task = asyncio.create_task(waiter())
+            threading.Thread(
+                target=_hit_callback_when_ready,
+                args=(
+                    f"http://127.0.0.1:{port}/callback"
+                    "?error=invalid_request&error_description=Missing+redirect_uri",
+                ),
+                daemon=True,
+            ).start()
+            return await asyncio.wait_for(task, timeout=20)
+
+        with pytest.raises(OAuthProviderError) as excinfo:
+            asyncio.run(drive())
+
+        exc = excinfo.value
+        # Still a RuntimeError for callers that catch the old type.
+        assert isinstance(exc, RuntimeError)
+        # But NOT the "nobody is at the keyboard" error — the user was there
+        # and the provider said no.
+        assert not isinstance(exc, OAuthNonInteractiveError)
+        assert exc.error == "invalid_request"
+        assert exc.error_description == "Missing redirect_uri"
+        assert "OAuth authorization failed: invalid_request" in str(exc)
+        assert "Missing redirect_uri" in str(exc)
+
+    def test_pasted_callback_error_raises_provider_error(self, monkeypatch):
+        """The stdin paste fallback carries the same typing as the listener."""
+        import tools.mcp_oauth as mod
+
+        monkeypatch.setattr(mod, "_is_interactive", lambda: True)
+        monkeypatch.setattr(mod, "_raise_if_non_interactive", lambda lead: None)
+        pasted = (
+            "http://127.0.0.1:1/callback?error=access_denied"
+            "&error_description=The+user+denied+the+request\n"
+        )
+        monkeypatch.setattr("sys.stdin", MagicMock(readline=lambda: pasted))
+
+        async def instant_sleep(_):
+            pass
+
+        waiter = mod._make_callback_waiter(_find_free_port())
+        with patch.object(mod.asyncio, "sleep", instant_sleep):
+            with pytest.raises(OAuthProviderError) as excinfo:
+                asyncio.run(waiter())
+
+        assert excinfo.value.error == "access_denied"
+        assert excinfo.value.error_description == "The user denied the request"
+
+    def test_user_skip_is_still_non_interactive_error(self, monkeypatch):
+        """The skip sentinel keeps its existing (non-fatal) type."""
+        import tools.mcp_oauth as mod
+
+        monkeypatch.setattr(mod, "_is_interactive", lambda: True)
+        monkeypatch.setattr(mod, "_raise_if_non_interactive", lambda lead: None)
+        monkeypatch.setattr("sys.stdin", MagicMock(readline=lambda: "skip\n"))
+
+        async def instant_sleep(_):
+            pass
+
+        waiter = mod._make_callback_waiter(_find_free_port())
+        with patch.object(mod.asyncio, "sleep", instant_sleep):
+            with pytest.raises(OAuthNonInteractiveError) as excinfo:
+                asyncio.run(waiter())
+        assert not isinstance(excinfo.value, OAuthProviderError)

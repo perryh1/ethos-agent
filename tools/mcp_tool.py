@@ -110,7 +110,7 @@ import shutil
 import sys
 import threading
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from types import SimpleNamespace
 from typing import Callable
 from datetime import datetime
@@ -1429,7 +1429,8 @@ def _classify_mcp_failure(exc: BaseException) -> str:
     burning the retry ladder (and log lines) on them is pure noise; ``run()``
     parks them immediately:
 
-    - auth failures (401/403) — need new credentials, not a retry;
+    - auth failures (401/403, OAuth flow/provider errors) — need new
+      credentials or a deliberate ``hermes mcp login``, not a retry;
     - :class:`NonMcpEndpointError` — the URL serves a web page, not MCP;
     - :class:`InvalidMcpUrlError` — unusable config;
     - ``FileNotFoundError`` / ``ENOENT`` — the stdio command doesn't exist.
@@ -2396,7 +2397,7 @@ class MCPServerTask:
         "_reconnect_retries", "_session_proven", "_was_parked",
         "_inflight_tasks", "_reconnecting", "_suspect_reason",
         "_teardown_race", "_permanent_grace_used", "_stdio_child_pids",
-        "_ever_connected",
+        "_ever_connected", "_self_probe_wake",
     )
 
     def __init__(self, name: str):
@@ -2437,6 +2438,11 @@ class MCPServerTask:
         # until the session proves healthy again — used to log the
         # parked→revived transition exactly once.
         self._was_parked: bool = False
+        # Set by _wait_for_reconnect_or_shutdown when a park ended because
+        # the self-probe timer fired rather than an explicit reconnect
+        # request. Consumed (and cleared) by _probe_oauth_policy on the next
+        # transport attempt.
+        self._self_probe_wake: bool = False
         # In-flight RPC bookkeeping (#48069 salvage): user-visible requests
         # registered while running so a reconnect/shutdown teardown can fail
         # them fast instead of orphaning them on a dying transport.
@@ -3154,6 +3160,12 @@ class MCPServerTask:
             request or self-probe timeout). The reconnect event is cleared
             before returning so the next park cycle starts from a fresh
             signal. Shutdown takes precedence.
+
+        Side effect: ``_self_probe_wake`` records whether the wake came from
+        the timer (``True``) or an explicit reconnect request (``False``).
+        A timed probe is unattended, so :meth:`_probe_oauth_policy` keeps it
+        from opening a browser; an explicit request (``/mcp`` refresh, OAuth
+        recovery, a new session's discovery nudge) stays interactive.
         """
         shutdown_task = asyncio.ensure_future(self._shutdown_event.wait())
         reconnect_task = asyncio.ensure_future(self._reconnect_event.wait())
@@ -3173,8 +3185,40 @@ class MCPServerTask:
                         pass
         if self._shutdown_event.is_set():
             return "shutdown"
+        self._self_probe_wake = not self._reconnect_event.is_set()
         self._reconnect_event.clear()
         return "reconnect"
+
+    def _probe_oauth_policy(self):
+        """Context manager for the next transport attempt's OAuth prompts.
+
+        A parked OAuth server self-probes every ``_PARKED_RETRY_INTERVAL``.
+        In an interactive process each probe would re-run the SDK's
+        authorization-code grant and open a fresh browser window — every
+        five minutes, forever, for a server whose provider already refused
+        (``error=access_denied`` / ``invalid_request``) or that has never
+        been authorized. A timed probe therefore runs with interactive OAuth
+        suppressed: cached tokens (e.g. freshly written by ``hermes mcp
+        login``) are still picked up and revive the server, but a flow that
+        would need the browser fails fast with ``OAuthNonInteractiveError``
+        and re-parks quietly. Explicit reconnect requests are unaffected, so
+        a deliberate retry still opens the browser.
+        """
+        probe = self._self_probe_wake
+        self._self_probe_wake = False
+        if not probe or self._auth_type != "oauth":
+            return nullcontext()
+        try:
+            from tools.mcp_oauth import suppress_interactive_oauth
+        except ImportError:
+            return nullcontext()
+        logger.debug(
+            "MCP server '%s': parked self-probe reconnects without "
+            "interactive OAuth (no browser prompt); run `hermes mcp login %s` "
+            "to (re)authorize deliberately",
+            self.name, self.name,
+        )
+        return suppress_interactive_oauth()
 
     async def _run_stdio(self, config: dict):
         """Run the server using stdio transport."""
@@ -3999,10 +4043,11 @@ class MCPServerTask:
 
         while True:
             try:
-                if self._is_http():
-                    lifecycle_reason = await self._run_http(config)
-                else:
-                    lifecycle_reason = await self._run_stdio(config)
+                with self._probe_oauth_policy():
+                    if self._is_http():
+                        lifecycle_reason = await self._run_http(config)
+                    else:
+                        lifecycle_reason = await self._run_stdio(config)
                 # Transport returned cleanly. Two cases:
                 #  - _shutdown_event was set: exit the run loop entirely.
                 #  - _reconnect_event was set (auth recovery): loop back and
@@ -4150,8 +4195,13 @@ class MCPServerTask:
                         # re-authenticated with ``hermes mcp login``. Parking
                         # keeps the task alive so the 300s self-probe (and an
                         # explicit /mcp refresh) can pick up fresh tokens.
+                        # WARN once on the transition into parked; a
+                        # self-probe that fails the same way re-parks at
+                        # DEBUG so the `hermes mcp login` hint is not
+                        # repeated every _PARKED_RETRY_INTERVAL.
+                        _log = logger.debug if self._was_parked else logger.warning
                         if _is_auth_error(root):
-                            logger.warning(
+                            _log(
                                 "MCP server '%s' failed initial authentication, "
                                 "parking until credentials change; re-authenticate "
                                 "with `hermes mcp login %s` "
@@ -4160,7 +4210,7 @@ class MCPServerTask:
                                 type(root).__name__, root,
                             )
                         else:
-                            logger.warning(
+                            _log(
                                 "MCP server '%s' failed initial connection with a "
                                 "permanent error, parking without retries "
                                 "(state: connecting → parked): %s: %s",
@@ -4883,6 +4933,10 @@ def _get_auth_error_types() -> tuple:
         optional import for forward/backward compatibility.
       - ``tools.mcp_oauth.OAuthNonInteractiveError`` — raised by our callback
         handler when no user is present to complete a browser flow.
+      - ``tools.mcp_oauth.OAuthProviderError`` — raised by our callback
+        handler when the authorization server redirected back with
+        ``error=`` (user declined, invalid_request, ...). Retrying would only
+        open another browser window and hit the same wall.
       - ``HTTPStatusError`` from both httpx flavours — caller must
         additionally check ``status_code == 401`` via :func:`_is_auth_error`.
     """
@@ -4902,8 +4956,8 @@ def _get_auth_error_types() -> tuple:
     except ImportError:
         pass
     try:
-        from tools.mcp_oauth import OAuthNonInteractiveError
-        types.append(OAuthNonInteractiveError)
+        from tools.mcp_oauth import OAuthNonInteractiveError, OAuthProviderError
+        types.extend([OAuthNonInteractiveError, OAuthProviderError])
     except ImportError:
         pass
     types.extend(_http_status_error_types())
