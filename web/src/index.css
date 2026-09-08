@@ -49,16 +49,18 @@
 
 :root {
   /* LENS_0 — from design-language/src/ui/components/overlays/index.tsx.
-     These are the defaults for the `default` (Hermes Teal) dashboard theme;
-     ThemeProvider rewrites them as inline styles when a user switches themes. */
+     These are the defaults for the `default` (Ethos Brass) dashboard theme and
+     must stay in step with `defaultTheme` in themes/presets.ts; ThemeProvider
+     rewrites them as inline styles when a user switches themes. They matter on
+     the very first paint, before the provider has run. */
   --foreground: color-mix(in srgb, #ffffff 0%, transparent);
   --foreground-base: #ffffff;
   --foreground-alpha: 0;
-  --midground: color-mix(in srgb, #ffe6cb 100%, transparent);
-  --midground-base: #ffe6cb;
+  --midground: color-mix(in srgb, #22262C 100%, transparent);
+  --midground-base: #22262C;
   --midground-alpha: 1;
-  --background: color-mix(in srgb, #041c1c 100%, transparent);
-  --background-base: #041c1c;
+  --background: color-mix(in srgb, #F4F4EF 100%, transparent);
+  --background-base: #F4F4EF;
   --background-alpha: 1;
 
   /* Typography tokens — rewritten by ThemeProvider. Defaults match the
@@ -84,8 +86,8 @@
      look: cream input + emerald-400 output read as warm/cool against
      the dark canvas. Themes override via ThemeProvider, which emits
      these as `--series-input-token` / `--series-output-token`. */
-  --series-input-token: #ffe6cb;
-  --series-output-token: #34d399;
+  --series-input-token: #886A27;
+  --series-output-token: #3E7A5E;
 }
 
 /* Theme tokens cascade into the document root so every descendant inherits

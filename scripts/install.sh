@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# Hermes Agent Installer
+# Ethos Installer (built on the Hermes Agent installer)
 # ============================================================================
 # Installation script for Linux, macOS, and Android/Termux.
 # Uses uv for desktop/server installs and Python's stdlib venv + pip on Termux.
@@ -33,12 +33,17 @@ fi
 export UV_NO_CONFIG=1
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
+# Ethos: retuned to the Brass palette the dashboard and the printed profile
+# share. The variable names stay upstream's so the 3.6k lines below need no
+# edits and the diff stays rebaseable — only the values change. 256-colour
+# rather than truecolor: every terminal that runs this supports it, including
+# macOS Terminal, where truecolor is not guaranteed.
+RED='\033[38;5;167m'      # brick, for failures
+GREEN='\033[38;5;179m'    # brass, for the success ticks
+YELLOW='\033[38;5;173m'   # warm amber, for warnings
+BLUE='\033[38;5;110m'     # slate blue
+MAGENTA='\033[38;5;179m'  # brass, for the banner
+CYAN='\033[38;5;109m'     # muted teal, for progress arrows
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
@@ -164,7 +169,7 @@ while [[ $# -gt 0 ]]; do
             ;;
 
         -h|--help)
-            echo "Hermes Agent Installer"
+            echo "Ethos Installer"
             echo ""
             echo "Usage: install.sh [OPTIONS]"
             echo ""
@@ -220,9 +225,10 @@ print_banner() {
     echo ""
     echo -e "${MAGENTA}${BOLD}"
     echo "┌─────────────────────────────────────────────────────────┐"
-    echo "│             ⚕ Hermes Agent Installer                    │"
+    echo "│                  ⚕ Ethos Installer                      │"
     echo "├─────────────────────────────────────────────────────────┤"
-    echo "│  An open source AI agent by Nous Research.              │"
+    echo "│  Your own AI, on your own values.                       │"
+    echo "│  Built on Hermes Agent (MIT) by Nous Research.          │"
     echo "└─────────────────────────────────────────────────────────┘"
     echo -e "${NC}"
 }

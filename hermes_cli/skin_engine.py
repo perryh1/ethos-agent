@@ -199,11 +199,9 @@ class SkinConfig:
 # =============================================================================
 
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
-    "default": {
-        "name": "default",
-        "description": "Classic Hermes — gold and kawaii",
-        # Dark-authored. Values match the TUI's DARK_THEME so the classic CLI
-        # and the TUI render the same Hermes gold.
+    "gold": {
+        "name": "gold",
+        "description": "Classic Hermes — gold and kawaii (the look before Brass)",
         "colors": {
             "banner_border": "#CD7F32",
             "banner_title": "#FFD700",
@@ -233,6 +231,45 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "selection_bg": "#3a3a55",
             "shell_dollar": "#4dabf7",
             "voice_status_bg": "#1a1a2e",
+        },
+    },
+    "default": {
+        "name": "default",
+        "description": "Ethos Brass — paper palette, lifted for a dark terminal",
+        # Dark-authored. The same brass family as the dashboard's default theme
+        # and the printed profile, but raised in lightness: #886A27 is tuned to
+        # clear WCAG AA as ink on paper, and at that value it reads as mud on a
+        # dark terminal. The ladder below keeps the hue and re-solves for a dark
+        # ground. The previous gold lives on as the "gold" skin.
+        "colors": {
+            "banner_border": "#A07D3F",
+            "banner_title": "#D9BE7F",
+            "banner_accent": "#C7A96B",
+            "banner_dim": "#8A7340",
+            "banner_text": "#EFE7D6",
+            "ui_accent": "#C7A96B",
+            "ui_label": "#B08D4B",
+            "ui_ok": "#7FA98B",
+            "ui_error": "#D98A80",
+            "ui_warn": "#D9A441",
+            "prompt": "#EFE7D6",
+            "input_rule": "#A07D3F",
+            "response_border": "#C7A96B",
+            "status_bar_bg": "#22262C",
+            "status_bar_text": "#B9BCC2",
+            "status_bar_strong": "#D9BE7F",
+            "status_bar_dim": "#7E838C",
+            "status_bar_good": "#7FA98B",
+            "status_bar_warn": "#D9A441",
+            "status_bar_bad": "#D98A80",
+            "status_bar_critical": "#E0685C",
+            "session_label": "#B08D4B",
+            "session_border": "#5B6068",
+            "completion_menu_bg": "#22262C",
+            "completion_menu_current_bg": "#33383F",
+            "selection_bg": "#3A4048",
+            "shell_dollar": "#8FB8C9",
+            "voice_status_bg": "#22262C",
         },
         # Light overlay (merged onto `colors`; dark mode renders the vivid
         # block above untouched). The goldenrod ladder: on white, the vivid

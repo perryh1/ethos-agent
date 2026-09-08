@@ -58,6 +58,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from hermes_cli import __version__, __release_date__
+from hermes_cli import __ethos_version__ as _ETHOS_VERSION
 from hermes_cli.config import (
     build_cron_model_impact,
     cfg_get,
@@ -4088,6 +4089,10 @@ async def get_status(profile: Optional[str] = None):
             _ethos_status = {"active": False}
         status = {
             "version": __version__,
+            # Ethos: this distribution's own version. Additive — ``version``
+            # above stays the Hermes core version because the dashboard's
+            # restart-required check and the desktop readiness probe compare it.
+            "ethos_version": _ETHOS_VERSION,
             "release_date": __release_date__,
             "config_version": current_ver,
             "latest_config_version": latest_ver,
@@ -18221,8 +18226,9 @@ def mount_spa(application: FastAPI):
 # Built-in dashboard themes — label + description only.  The actual color
 # definitions live in the frontend (web/src/themes/presets.ts).
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default",       "label": "Ethos Teal",         "description": "Classic dark teal — the canonical Ethos look"},
-    {"name": "default-large", "label": "Ethos Teal (Large)", "description": "Ethos Teal with bigger fonts and roomier spacing"},
+    {"name": "default",       "label": "Ethos Brass",         "description": "Paper and brass — the palette the profile is printed in"},
+    {"name": "default-large", "label": "Ethos Brass (Large)", "description": "Ethos Brass with bigger fonts and roomier spacing"},
+    {"name": "teal",          "label": "Ethos Teal",          "description": "Classic dark teal — the look before Brass"},
     {"name": "nous-blue",     "label": "Nous Blue",           "description": "Light mode — vivid Nous-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
