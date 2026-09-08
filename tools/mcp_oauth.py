@@ -59,7 +59,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse
 from hermes_constants import secure_parent_dir
 
 logger = logging.getLogger(__name__)
@@ -797,6 +797,43 @@ def _make_callback_handler() -> tuple[type, dict]:
 # ---------------------------------------------------------------------------
 
 
+def _merge_endpoint_query(authorization_url: str) -> str:
+    """Fold a doubled query string back into one.
+
+    The MCP SDK builds the front-channel URL as
+    ``f"{authorization_endpoint}?{urlencode(params)}"`` (``mcp/client/auth/
+    oauth2.py``, unchanged through 2.2.0). When the server's advertised
+    ``authorization_endpoint`` already carries a query — Railway publishes
+    ``/oauth/auth?resource=https%3A%2F%2Fbackboard.railway.com`` — the result
+    contains two ``?``. Every standards parser then reads the first pair as
+    ``resource=https://backboard.railway.com?response_type=code`` and the
+    provider bounces the browser back with ``invalid_request: missing
+    required parameter 'response_type'`` (``state`` and ``iss`` intact, since
+    every later pair survives), and the reconnect ladder re-opens a browser
+    tab on each retry.
+
+    Merge the two queries into one. On a name collision the SDK's parameter
+    wins — the ``URL.searchParams.set`` semantics of the TypeScript SDK, which
+    is the client these providers are exercised against — so the RFC 8707
+    ``resource`` the SDK derives from protected-resource metadata replaces the
+    endpoint's copy. ``urlencode`` percent-encodes ``?`` inside values, so a
+    second literal ``?`` can only be the SDK's own separator; a URL with at
+    most one ``?`` is returned untouched.
+    """
+    base, sep, query = authorization_url.partition("?")
+    if not sep or "?" not in query:
+        return authorization_url
+    endpoint_query, _, sdk_query = query.partition("?")
+    sdk_pairs = parse_qsl(sdk_query, keep_blank_values=True)
+    sdk_keys = {key for key, _ in sdk_pairs}
+    kept = [
+        (key, value)
+        for key, value in parse_qsl(endpoint_query, keep_blank_values=True)
+        if key not in sdk_keys
+    ]
+    return f"{base}?{urlencode(kept + sdk_pairs)}"
+
+
 def _make_redirect_handler(port: int, redirect_uri: str | None = None):
     """Return a redirect handler closure that closes over the given port.
 
@@ -815,6 +852,10 @@ def _make_redirect_handler(port: int, redirect_uri: str | None = None):
         Opens the browser automatically when possible; always prints the URL
         as a fallback for headless/SSH/gateway environments.
         """
+        # Repair before any consumer sees it: the dashboard/desktop flow, the
+        # printed fallback, and the browser all get the same URL.
+        authorization_url = _merge_endpoint_query(authorization_url)
+
         from tools.mcp_dashboard_oauth import get_dashboard_oauth_flow
 
         dashboard_flow = get_dashboard_oauth_flow()
