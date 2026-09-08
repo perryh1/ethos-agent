@@ -69,6 +69,24 @@ class TestClassifyMcpFailure:
         g = _group(_group(FileNotFoundError("cmd not found")))
         assert _classify_mcp_failure(g) == "permanent"
 
+    @pytest.mark.parametrize("error", [
+        "access_denied",      # user clicked Cancel
+        "invalid_request",    # malformed authorize URL
+        "invalid_scope",
+        "unauthorized_client",
+    ])
+    def test_oauth_provider_error_permanent(self, error):
+        """A provider ``error=`` at the callback is deterministic: the user
+        already saw the browser page, so every retry re-opens a browser and
+        hits the same wall. Must park, not climb the retry ladder."""
+        from tools.mcp_oauth import OAuthProviderError
+
+        assert _classify_mcp_failure(OAuthProviderError(error)) == "permanent"
+        # ...and when the SDK's anyio TaskGroup wraps it.
+        assert _classify_mcp_failure(
+            _group(OAuthProviderError(error, "detail"))
+        ) == "permanent"
+
 
 # ── Keepalive failure log surfaces the root cause ────────────────────────────
 

@@ -44,6 +44,7 @@ Configuration in config.yaml::
 
 import asyncio
 import contextvars
+import html
 import json
 import logging
 import os
@@ -145,6 +146,31 @@ except ImportError:
 
 class OAuthNonInteractiveError(RuntimeError):
     """Raised when OAuth requires browser interaction in a non-interactive env."""
+
+
+class OAuthProviderError(RuntimeError):
+    """Raised when the authorization server answers the callback with ``error=``.
+
+    RFC 6749 section 4.1.2.1: the provider redirected to our callback with
+    ``error=access_denied`` (user clicked Cancel), ``invalid_request``,
+    ``invalid_scope``, ``unauthorized_client`` and so on. The user already
+    saw the browser page, so re-running the authorization-code grant will
+    only open another window and hit the same wall. ``tools.mcp_tool``
+    registers this as an auth error so the server parks instead of burning
+    the reconnect ladder (one browser open per retry).
+
+    Attributes:
+        error: the provider's ``error`` code.
+        error_description: the provider's ``error_description``, if any.
+    """
+
+    def __init__(self, error: str, error_description: "str | None" = None):
+        self.error = error
+        self.error_description = error_description
+        msg = f"OAuth authorization failed: {error}"
+        if error_description:
+            msg += f" ({error_description})"
+        super().__init__(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -754,6 +780,7 @@ def _make_callback_handler() -> tuple[type, dict]:
     """
     result: dict[str, Any] = {
         "auth_code": None, "state": None, "error": None, "iss": None,
+        "error_description": None,
     }
 
     class _Handler(BaseHTTPRequestHandler):
@@ -762,6 +789,10 @@ def _make_callback_handler() -> tuple[type, dict]:
             code = params.get("code", [None])[0]
             state = params.get("state", [None])[0]
             error = params.get("error", [None])[0]
+            # RFC 6749 section 4.1.2.1 optional human-readable detail — the
+            # only clue to *why* the provider refused (e.g. a malformed
+            # authorize URL vs. the user clicking Cancel).
+            error_description = params.get("error_description", [None])[0]
             # RFC 9207 authorization-response issuer. mcp 2.0 validates it
             # against the discovered metadata and *rejects* a response that
             # omits it when the authorization server advertised
@@ -773,13 +804,16 @@ def _make_callback_handler() -> tuple[type, dict]:
             result["state"] = state
             result["error"] = error
             result["iss"] = iss
+            result["error_description"] = error_description
 
             body = (
                 "<html><body><h2>Authorization Successful</h2>"
                 "<p>You can close this tab and return to Hermes.</p></body></html>"
             ) if code else (
                 "<html><body><h2>Authorization Failed</h2>"
-                f"<p>Error: {error or 'unknown'}</p></body></html>"
+                f"<p>Error: {html.escape(error or 'unknown')}"
+                + (f" — {html.escape(error_description)}" if error_description else "")
+                + "</p></body></html>"
             )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -945,6 +979,8 @@ def _make_callback_waiter(
     Raises (when awaited):
         OAuthNonInteractiveError: If the callback times out (no user present
             to complete the browser auth), or in non-interactive contexts.
+        OAuthProviderError: If the authorization server redirected back with
+            ``error=...`` (the user declined, or the request was rejected).
     """
 
     async def _wait():
@@ -1046,7 +1082,13 @@ def _make_callback_waiter(
         if result["error"] == _USER_SKIPPED_SENTINEL:
             raise OAuthNonInteractiveError("user_skipped")
         if result["error"]:
-            raise RuntimeError(f"OAuth authorization failed: {result['error']}")
+            # The provider refused (access_denied, invalid_request, ...).
+            # Typed so mcp_tool classifies it as permanent and parks the
+            # server after this one browser open instead of retrying the
+            # grant — which would open a fresh window per attempt.
+            raise OAuthProviderError(
+                result["error"], result.get("error_description")
+            )
         if result["auth_code"] is None:
             hint = ""
             if cimd_url:
@@ -1135,6 +1177,7 @@ def _paste_callback_reader(result: dict) -> None:
     code = params.get("code", [None])[0]
     state = params.get("state", [None])[0]
     error = params.get("error", [None])[0]
+    error_description = params.get("error_description", [None])[0]
     iss = params.get("iss", [None])[0]  # RFC 9207 — see _make_callback_handler
 
     if not code and not error:
@@ -1151,6 +1194,7 @@ def _paste_callback_reader(result: dict) -> None:
     result["auth_code"] = code
     result["state"] = state
     result["error"] = error
+    result["error_description"] = error_description
     result["iss"] = iss
     if code:
         print("  Got authorization code from paste — completing flow.", file=sys.stderr)
