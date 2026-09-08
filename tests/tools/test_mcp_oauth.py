@@ -5,6 +5,7 @@ import stat
 import sys
 from io import BytesIO
 from unittest.mock import patch, MagicMock
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -21,6 +22,7 @@ from tools.mcp_oauth import (
     _wait_for_callback,
     _make_callback_handler,
     _make_redirect_handler,
+    _merge_endpoint_query,
     _paste_callback_reader,
 )
 
@@ -1112,3 +1114,95 @@ def test_humanize_non_registration_403_passthrough():
         )
         is None
     )
+
+
+class TestMergeEndpointQuery:
+    """The SDK appends ``?<params>`` to the advertised authorization_endpoint
+    verbatim, so an endpoint that already carries a query (Railway) yields two
+    ``?`` and the provider never sees ``response_type``."""
+
+    RAILWAY = (
+        "https://backboard.railway.com/oauth/auth?resource=https%3A%2F%2Fbackboard.railway.com"
+        "?response_type=code&client_id=abc"
+        "&redirect_uri=http%3A%2F%2F127.0.0.1%3A27892%2Fcallback"
+        "&state=s1&code_challenge=cc&code_challenge_method=S256"
+        "&resource=https%3A%2F%2Fmcp.railway.com&scope=openid+offline_access&prompt=consent"
+    )
+
+    def test_malformed_url_loses_response_type_as_a_provider_parses_it(self):
+        # The failure, parsed the way any server parses a query string: the
+        # endpoint's own pair swallows the SDK's separator.
+        q = parse_qs(urlparse(self.RAILWAY).query)
+        assert "response_type" not in q
+        assert q["resource"][0].startswith("https://backboard.railway.com?response_type")
+        assert q["state"] == ["s1"]
+
+    def test_merges_into_one_query_with_sdk_params_winning(self):
+        fixed = _merge_endpoint_query(self.RAILWAY)
+        assert fixed.count("?") == 1
+        assert fixed.startswith("https://backboard.railway.com/oauth/auth?")
+        q = parse_qs(urlparse(fixed).query)
+        assert q["response_type"] == ["code"]
+        assert q["client_id"] == ["abc"]
+        assert q["redirect_uri"] == ["http://127.0.0.1:27892/callback"]
+        assert q["state"] == ["s1"]
+        assert q["code_challenge"] == ["cc"]
+        assert q["code_challenge_method"] == ["S256"]
+        assert q["scope"] == ["openid offline_access"]
+        assert q["prompt"] == ["consent"]
+        # Same-named parameter: the SDK's RFC 8707 resource replaces the
+        # endpoint's copy, as URL.searchParams.set does in the TypeScript SDK.
+        assert q["resource"] == ["https://mcp.railway.com"]
+
+    def test_endpoint_params_without_collision_are_kept_first(self):
+        fixed = _merge_endpoint_query(
+            "https://idp.example/authorize?tenant=acme?response_type=code&state=s"
+        )
+        assert fixed == "https://idp.example/authorize?tenant=acme&response_type=code&state=s"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://idp.example/authorize?response_type=code&state=s",
+            "https://idp.example/authorize",
+            # A percent-encoded ? inside a value is not a separator.
+            "https://idp.example/authorize?q=a%3Fb&state=s",
+        ],
+    )
+    def test_well_formed_urls_are_returned_unchanged(self, url):
+        assert _merge_endpoint_query(url) == url
+
+    def test_redirect_handler_opens_and_prints_the_repaired_url(self, monkeypatch, capsys):
+        import tools.mcp_oauth as mod
+
+        monkeypatch.setattr(mod, "_is_interactive", lambda: True)
+        monkeypatch.delenv("SSH_CLIENT", raising=False)
+        monkeypatch.delenv("SSH_TTY", raising=False)
+        monkeypatch.setattr(mod, "_can_open_browser", lambda: True)
+        opened = MagicMock(return_value=True)
+        monkeypatch.setattr("webbrowser.open", opened)
+
+        asyncio.run(_make_redirect_handler(27892)(self.RAILWAY))
+
+        url = opened.call_args.args[0]
+        assert url.count("?") == 1
+        assert parse_qs(urlparse(url).query)["response_type"] == ["code"]
+        # The printed fallback is the same URL the browser received.
+        assert url in capsys.readouterr().err
+
+    def test_redirect_handler_publishes_the_repaired_url_to_the_dashboard(self):
+        from tools.mcp_dashboard_oauth import DashboardOAuthFlow, dashboard_oauth_flow
+
+        flow = DashboardOAuthFlow(
+            flow_id="flow-rw",
+            server_name="railway",
+            profile=None,
+            hermes_home="/tmp/hermes-test",
+            redirect_uri="https://agent.example/mcp/oauth/callback/flow-rw",
+        )
+        with dashboard_oauth_flow(flow):
+            asyncio.run(_make_redirect_handler(0)(self.RAILWAY))
+
+        assert flow.authorization_url.count("?") == 1
+        assert flow.expected_state == "s1"
+        assert parse_qs(urlparse(flow.authorization_url).query)["response_type"] == ["code"]
