@@ -38,10 +38,76 @@ const DEFAULT_LAYOUT: ThemeLayout = {
 // Themes
 // ---------------------------------------------------------------------------
 
+/** Ethos Brass — paper and brass, the canonical Ethos look.
+ *
+ * The same palette the compiled Values Profile and the setup guide are printed
+ * in, so the app looks like the documents it produces rather than a separate
+ * thing that happens to emit them.
+ *
+ * This is a light theme on a system built around `background` + `midground`,
+ * which inverts cleanly: `midground` is the text colour, and the derived
+ * tokens in index.css are all `color-mix(midground N%, background)`. The one
+ * place inversion gives the wrong answer is panels — that mix darkens a card
+ * against a light ground, where the light-UI convention is a card slightly
+ * *lighter* than its surroundings — so `card`/`popover` are set explicitly
+ * below rather than derived.
+ */
 export const defaultTheme: DashboardTheme = {
   name: "default",
+  label: "Ethos Brass",
+  description: "Paper and brass — the palette the profile is printed in",
+  palette: {
+    background: { hex: "#F4F4EF", alpha: 1 },
+    midground: { hex: "#22262C", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
+    warmGlow: "rgba(136, 106, 39, 0.16)",
+    noiseOpacity: 0.3,
+  },
+  typography: DEFAULT_TYPOGRAPHY,
+  layout: DEFAULT_LAYOUT,
+  // Brass is #886A27 rather than the #96752B the print palette uses: same hue
+  // and saturation, three steps darker, because #96752B lands at 3.90:1 on
+  // paper and 4.23:1 on card — under WCAG AA for body-size text, and under it
+  // again for white text on a brass-filled button. #886A27 clears 4.5:1 in all
+  // three directions while staying visually the same brass.
+  colorOverrides: {
+    card: "#FDFDFB",
+    cardForeground: "#22262C",
+    popover: "#FDFDFB",
+    popoverForeground: "#22262C",
+    primary: "#886A27",
+    primaryForeground: "#FDFDFB",
+    secondary: "#EDEDE6",
+    secondaryForeground: "#22262C",
+    muted: "#EDEDE6",
+    mutedForeground: "#5B6068",
+    accent: "#886A27",
+    accentForeground: "#FDFDFB",
+    border: "#DCDCD2",
+    input: "#DCDCD2",
+    ring: "#886A27",
+    success: "#3E7A5E",
+    warning: "#8A6A1F",
+    destructive: "#A3392F",
+  },
+  // Upstream's series accents are a mint green that belongs to no Ethos
+  // palette; on paper it also fails contrast against the chart ground.
+  seriesColors: {
+    inputTokenAccent: "#886A27",
+    outputTokenAccent: "#3E7A5E",
+  },
+  swatchColors: ["#F4F4EF", "#886A27", "#22262C"],
+  // The embedded terminal stays dark: a light xterm pane fights every tool
+  // that writes ANSI colour into it.
+  terminalBackground: "#22262C",
+  terminalForeground: "#E9E9E2",
+};
+
+/** The previous canonical look, kept selectable rather than deleted. */
+export const tealTheme: DashboardTheme = {
+  name: "teal",
   label: "Ethos Teal",
-  description: "Classic dark teal — the canonical Ethos look",
+  description: "Classic dark teal — the look before Brass",
   palette: {
     background: { hex: "#041c1c", alpha: 1 },
     midground: { hex: "#ffe6cb", alpha: 1 },
@@ -51,6 +117,10 @@ export const defaultTheme: DashboardTheme = {
   },
   typography: DEFAULT_TYPOGRAPHY,
   layout: DEFAULT_LAYOUT,
+  seriesColors: {
+    inputTokenAccent: "#FFD700",
+    outputTokenAccent: "#CD7F32",
+  },
   terminalBackground: "#000000",
 };
 
@@ -214,7 +284,7 @@ export const nousBlueTheme: DashboardTheme = {
  */
 export const defaultLargeTheme: DashboardTheme = {
   name: "default-large",
-  label: "Ethos Teal (Large)",
+  label: "Ethos Brass (Large)",
   description: "Ethos Teal with bigger fonts and roomier spacing",
   palette: defaultTheme.palette,
   typography: {
@@ -230,6 +300,7 @@ export const defaultLargeTheme: DashboardTheme = {
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
+  teal: tealTheme,
   "default-large": defaultLargeTheme,
   "nous-blue": nousBlueTheme,
   midnight: midnightTheme,

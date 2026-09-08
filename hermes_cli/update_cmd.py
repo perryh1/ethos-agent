@@ -2329,14 +2329,22 @@ def _discard_stashed_changes(
     print("→ Discarded local source changes (updates.non_interactive_local_changes=discard).")
     return True
 
+# Ethos: this distribution's own repository is the official one for an Ethos
+# install. Upstream (NousResearch/hermes-agent) is the *ancestor*, not the
+# update source: `origin` here is the Ethos fork, upstream releases are not
+# Ethos releases, and merging upstream is a deliberate maintenance decision
+# made in the fork — never something an end user should be nudged into from an
+# update prompt. Left pointing at upstream, every Ethos user was told they
+# "may miss updates from NousResearch/hermes-agent" and offered a remote that,
+# if ever pulled, would land upstream Hermes on top of the constitution layer.
 OFFICIAL_REPO_URLS = {
-    "https://github.com/NousResearch/hermes-agent.git",
-    "git@github.com:NousResearch/hermes-agent.git",
-    "https://github.com/NousResearch/hermes-agent",
-    "git@github.com:NousResearch/hermes-agent",
+    "https://github.com/perryh1/ethos-agent.git",
+    "git@github.com:perryh1/ethos-agent.git",
+    "https://github.com/perryh1/ethos-agent",
+    "git@github.com:perryh1/ethos-agent",
 }
 
-OFFICIAL_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL_REPO_URL = "https://github.com/perryh1/ethos-agent.git"
 
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
@@ -2461,8 +2469,8 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
 
         # Ask user if they want to add upstream
         print()
-        print("ℹ Your fork is not tracking the official Hermes repository.")
-        print("  This means you may miss updates from NousResearch/hermes-agent.")
+        print("ℹ Your fork is not tracking the official Ethos repository.")
+        print("  This means you may miss updates from perryh1/ethos-agent.")
         print()
         try:
             response = (

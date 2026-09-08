@@ -17,6 +17,16 @@ import sys
 __version__ = "0.20.5"
 __release_date__ = "2026.8.19"
 
+# Ethos: this distribution's own version, independent of the Hermes core
+# version above. Kept separate on purpose — ``__version__`` is the upstream
+# package version and is what providers send in User-Agent strings, what the
+# gateway API reports, and what health checks compare, so it must keep tracking
+# upstream. Ethos ships its own changes on its own cadence and needs a number
+# that says so. Both are shown together wherever a version is displayed, so the
+# provenance stays honest rather than implying Ethos wrote the whole agent.
+__ethos_version__ = "0.1.0"
+__ethos_release_date__ = "2026.9.8"
+
 
 def _ensure_utf8():
     """Force UTF-8 stdout/stderr to prevent UnicodeEncodeError crashes.
